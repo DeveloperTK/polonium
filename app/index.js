@@ -33,6 +33,8 @@ fs.mkdirSync(downloadedMediaDirectory);
 const generatedMediaDirectory = __dirname + '/../media/' + currentTime + '/generated';
 fs.mkdirSync(generatedMediaDirectory);
 
+fs.mkdirSync('/../media/' + currentTime + '/result');
+
 const gameIDs = {
     justChatting: 509658
 }
