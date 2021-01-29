@@ -102,3 +102,13 @@ dist
 
 # TernJS port file
 .tern-port
+
+# downloaded and generated media files
+media
+
+# test files
+test
+
+# editor files
+.idea
+*.iml
