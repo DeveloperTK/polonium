@@ -1,0 +1,22 @@
+{
+  "name": "polonium",
+  "version": "1.0.0",
+  "description": "Twitch top clips compilation generator using the twitch api and ffmpeg",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "just-chatting-en": "node app/index.js 509658 en",
+    "start": "node app/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com//DeveloperTK/polonium.git"
+  },
+  "author": "Christian Schliz <code@foxat.de>",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "dotenv": "^8.2.0",
+    "fluent-ffmpeg": "^2.1.2"
+  }
+}
