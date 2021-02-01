@@ -112,3 +112,6 @@ test
 # editor files
 .idea
 *.iml
+
+# local persistent storage files
+video-number.txt

@@ -2,7 +2,8 @@ require('../config');
 
 const fs = require('fs');
 const https = require('https');
-const api = require('./twitch-api');
+const twitchApi = require('./twitch-api');
+const ffmpegApi = require('./ffmpeg-api');
 
 const gameID = process.argv.slice(2)[0];
 const locale = process.argv.slice(2)[1];
@@ -19,49 +20,65 @@ if (!locale)
 
 const mediaDirectory = __dirname + '/../media';
 
-try {
-    fs.mkdirSync(mediaDirectory);
-} catch (ignored) {
-    // directory probably exists
-}
+const downloadedMediaDirectory = mediaDirectory + '/' + currentTime + '/downloaded';
+fs.mkdirSync(downloadedMediaDirectory, {recursive: true});
 
-fs.mkdirSync(mediaDirectory + '/' + currentTime);
-
-const downloadedMediaDirectory = __dirname + '/../media/' + currentTime + '/downloaded';
-fs.mkdirSync(downloadedMediaDirectory);
-
-const generatedMediaDirectory = __dirname + '/../media/' + currentTime + '/generated';
-fs.mkdirSync(generatedMediaDirectory);
-
-fs.mkdirSync('/../media/' + currentTime + '/result');
+const generatedMediaDirectory = mediaDirectory + '/' + currentTime + '/generated';
+fs.mkdirSync(generatedMediaDirectory, {recursive: true});
 
 const gameIDs = {
     justChatting: 509658
 }
 
+const persistentNumberPath = __dirname + '/../video-number.txt';
+let currentNumber = 0;
+
+if (fs.existsSync(persistentNumberPath)) {
+    let fileInput = fs.readFileSync(persistentNumberPath).toString().trim();
+    currentNumber = Number(fileInput);
+} else {
+    fs.writeFileSync(persistentNumberPath, '0', {encoding: 'utf8'});
+}
+
 // download clips from twitch
 
-api.getYesterdaysTopClips(gameID, locale, clips => {
-    let meta = [];
+twitchApi.getYesterdaysTopClips(gameID, locale).then(clips => {
+    return new Promise((resolve) => {
+        let meta = [];
 
-    for (let i = 0; i < clips.length; i++) {
-        const link = clips[i].mediaURL;
+        for (let i = 0; i < clips.length; i++) {
+            const link = clips[i].mediaURL;
 
-        // output all video files
-        let file = fs.createWriteStream(downloadedMediaDirectory + `/${i}.mp4`, {flags: 'w', encoding: 'utf-8'});
-        https.get(link, response => {
-            response.pipe(file);
-        });
+            // output all video files
+            let file = fs.createWriteStream(downloadedMediaDirectory + `/${i}.mp4`, {flags: 'w', encoding: 'utf-8'});
+            https.get(link, response => {
+                response.pipe(file);
+                if (i === clips.length - 1) resolve();
+            });
 
-        meta.push({
-            filename: i + ".mp4",
-            link: clips[i].meta['url'],
-            channel: clips[i].meta['broadcaster_name']
-        });
-    }
+            meta.push({
+                filename: i + ".mp4",
+                link: clips[i].meta['url'],
+                channel: clips[i].meta['broadcaster_name']
+            });
+        }
 
-    // save metadata
-    fs.writeFileSync(downloadedMediaDirectory + '/meta.json', JSON.stringify(meta));
+        // save metadata
+        fs.writeFileSync(downloadedMediaDirectory + '/meta.json', JSON.stringify(meta));
+    });
+
+}).then(() => {
+
+    ffmpegApi.applyVideoFilters(mediaDirectory + '/' + currentTime).then(outputPath => {
+
+        console.log(outputPath);
+
+        // TODO: upload video to YouTube via YouTube Data API
+
+    }).catch(error => {
+        throw error;
+    });
+
+}).catch(error => {
+    console.error(error);
 });
-
-// TODO: generate video with ffmpeg
