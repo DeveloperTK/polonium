@@ -1,9 +1,14 @@
+// configure environment variables
 require('../config');
 
+// standard node imports
 const fs = require('fs');
 const https = require('https');
-const twitchApi = require('./twitch-api');
-const ffmpegApi = require('./ffmpeg-api');
+
+// module classes
+const twitchApi = new (require('./twitch-api')).class(process.env.TWITCH_API_CLIENTID, process.env.TWITCH_API_SECRET);
+const ffmpegApi = new (require('./ffmpeg-api')).class();
+const overlayFilters = new (require('./overlay-filters')).class();
 
 const gameID = process.argv.slice(2)[0];
 const locale = process.argv.slice(2)[1];
@@ -25,10 +30,6 @@ fs.mkdirSync(downloadedMediaDirectory, {recursive: true});
 
 const generatedMediaDirectory = mediaDirectory + '/' + currentTime + '/generated';
 fs.mkdirSync(generatedMediaDirectory, {recursive: true});
-
-const gameIDs = {
-    justChatting: 509658
-}
 
 const persistentNumberPath = __dirname + '/../video-number.txt';
 let currentNumber = 0;
@@ -69,7 +70,15 @@ twitchApi.getYesterdaysTopClips(gameID, locale).then(clips => {
 
 }).then(() => {
 
-    ffmpegApi.applyVideoFilters(mediaDirectory + '/' + currentTime).then(outputPath => {
+    const currentMediaDirectory = mediaDirectory + '/' + currentTime;
+
+    ffmpegApi.applyVideoFilters(
+        currentMediaDirectory,
+        currentNumber,
+        persistentNumberPath,
+        overlayFilters.videoCenteredText,
+        overlayFilters.thumbnailSingleImageWithText
+    ).then(outputPath => {
 
         console.log(outputPath);
 

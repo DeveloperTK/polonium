@@ -1,65 +1,35 @@
 const ffmpeg = require('fluent-ffmpeg');
-const ffprobe = ffmpeg.ffprobe;
 const { exec } = require("child_process");
 const fs = require('fs');
 
-function progressWrite(x) {
-    process.stdout.clearLine(undefined, undefined);
-    process.stdout.cursorTo(0);
-    process.stdout.write(x);
-}
+class FFmpegApi {
 
-async function applyVideoFilters(mediaDirectory, lastVideoNumber) {
-    return new Promise(async (globalResolve, globalReject) => {
+    constructor(introPath, outroPath) {
+        this.introPath = introPath;
+        this.outroPath = outroPath;
+    }
 
-        const metaList = JSON.parse(fs.readFileSync(mediaDirectory + '/downloaded/meta.json').toString());
+    progressWrite(x) {
+        process.stdout.clearLine(undefined, undefined);
+        process.stdout.cursorTo(0);
+        process.stdout.write(x);
+    }
 
-        for (let i = 0; i < metaList.length; i++) {
-            await new Promise((resolve, reject) => {
-                process.stdout.write("loading ffmpeg...");
-                ffmpeg(mediaDirectory + '/downloaded/' + metaList[i].filename).videoFilters(
-                    {
-                        filter: 'drawtext',
-                        options: {
-                            text: metaList[i].channel,
-                            fontfile: __dirname + '/OpenSans-SemiBold.ttf',
-                            fontsize: 48,
-                            fontcolor: 'white',
-                            x: '(w-text_w)/2',
-                            y: 75,
-                            box: 1,
-                            boxborderw: 18,
-                            boxcolor: 'black@0.6'
-                        }
-                    }
-                ).addOption("-qscale 0")
-                  .on('progress', progress => {
-                    progressWrite(`Applying video filters to file ${i + 1}/${metaList.length} (${Math.floor(progress.percent)}%)`);
-                }).on('error', error => {
-                    reject(error);
-                }).on('end', () => {
-                    progressWrite(`Done applying video filters to file ${metaList[i].filename}.ts\n`);
-                    resolve();
-                }).save(mediaDirectory + '/generated/' + metaList[i].filename + '.ts');
-            }).catch(error => {
-                globalReject(error);
-            });
-        }
+    _mergeVideos(mediaDirectory) {
+        return new Promise((resolve, reject) => {
+            const mergeCommand = `cd ${mediaDirectory}/generated; ffmpeg -f concat -safe 0 -i mergelist.txt -c copy result.ts`;
+            const mergeProcess = exec(mergeCommand);
 
-        let mergeFile = "";
+            mergeProcess.stdin.on('data', process.stdin.write);
+            mergeProcess.stdout.on('data', process.stdout.write);
+            mergeProcess.stderr.on('data', process.stderr.write);
 
-        for (let i = 0; i < metaList.length; i++) {
-            mergeFile += `file '${metaList[i].filename}.ts'\n`;
-        }
-
-        fs.writeFileSync(mediaDirectory + '/generated/mergelist.txt', mergeFile);
-
-        exec(`cd ${mediaDirectory}/generated; ffmpeg -f concat -safe 0 -i mergelist.txt -c copy result.ts`, (error, stdout, stderr) => {
-            if(error) throw error;
-            process.stdout.write(stdout);
-            process.stderr.write(stderr);
+            mergeProcess.on('close', resolve);
+            mergeProcess.on('error', reject);
         });
+    }
 
+    async _generateDescriptionFile(mediaDirectory, metaList, lastVideoNumber) {
         let videoDescription = `Top Twitch Compilation #${lastVideoNumber + 1}
 If you liked this video, please make sure to check out the original creators as well.
 They are listed in order of appearance below.\n\n`;
@@ -67,8 +37,8 @@ They are listed in order of appearance below.\n\n`;
 
         for (let i = 0; i < metaList.length; i++) {
             await new Promise(((resolve, reject) => {
-                ffprobe(mediaDirectory + '/generated/' + metaList[i].filename + '.ts', async (error, probeMeta) => {
-                    if(error) throw reject(error);
+                ffmpeg.ffprobe(mediaDirectory + '/generated/' + metaList[i].filename + '.ts', async (error, probeMeta) => {
+                    if (error) throw reject(error);
                     const position = new Date(currentDuration * 1000).toISOString().substr(14, 5)
                         .replace('-', ':').replace('-', ':');
                     videoDescription += `${position} ${metaList[i].channel}: ${metaList[i].link}\n`
@@ -79,11 +49,69 @@ They are listed in order of appearance below.\n\n`;
         }
 
         fs.writeFileSync(mediaDirectory + '/generated/description.txt', videoDescription, {encoding: 'utf8'});
+    }
 
+    async _generateVideoThumbnail(mediaDirectory, lastVideoNumber) {
         // TODO: generate video thumbnail
+    }
 
-        globalResolve(mediaDirectory + '/generated');
-    });
+    /**
+     * Applies video filters to all videos in a directory (determined by the meta.json file).
+     *
+     * @param mediaDirectory{String | URL}
+     * @param lastVideoNumber{Number}
+     * @param persistentNumberPath{String | URL}
+     * @param applyFilter{Function<String, String, Object, Number> | any}
+     * @param thumbnailStyle{Function<String, Object[], Number> | any}
+     * @returns {Promise<String>}
+     */
+    applyVideoFilters(mediaDirectory, lastVideoNumber, persistentNumberPath, applyFilter, thumbnailStyle, intermediatePath) {
+        return new Promise(async (resolve, reject) => {
+
+            const metaListPath = mediaDirectory + '/downloaded/meta.json';
+            const metaList = JSON.parse(fs.readFileSync(metaListPath).toString());
+
+            for (let i = 1; i < metaList.length; i++) {
+                const inputPath = mediaDirectory + '/downloaded/' + metaList[i].filename;
+                const outputPath = mediaDirectory + '/generated/' + metaList[i].filename + '.ts'
+
+                await applyFilter(this.progressWrite, inputPath, outputPath, metaList, i).catch(reason => {
+                    reject(reason);
+                });
+
+            }
+
+            let mergeList = "";
+
+            if (this.introPath) {
+                fs.copyFileSync(this.introPath, mediaDirectory + '/intro.ts');
+                mergeList += `file 'intro.ts'\n`;
+            }
+
+            mergeList += `file '${metaList[0].filename}.ts'\n`;
+
+            for (let i = 1; i < metaList.length; i++) {
+                mergeList += `file '${intermediatePath}'\n`;
+                mergeList += `file '${metaList[i].filename}.ts'\n`;
+            }
+
+            if (this.outroPath) {
+                fs.copyFileSync(this.outroPath, mediaDirectory + '/outro.ts');
+                mergeList += `file 'outro.ts'\n`;
+            }
+
+            const mergeListPath = mediaDirectory + '/generated/mergelist.txt'
+            fs.writeFileSync(mergeListPath, mergeList);
+
+            await this._mergeVideos(mediaDirectory);
+
+            await this._generateDescriptionFile(mediaDirectory, metaList, lastVideoNumber);
+
+            await thumbnailStyle(mediaDirectory, metaList, lastVideoNumber);
+
+            resolve(mediaDirectory + '/generated');
+        });
+    }
 }
 
-exports.applyVideoFilters = applyVideoFilters;
+module.exports.class = FFmpegApi;
