@@ -2,6 +2,10 @@ const ffmpeg = require('fluent-ffmpeg');
 const { exec } = require("child_process");
 const fs = require('fs');
 
+// hardcoded for now...
+const introLength = 7;
+const outroLength = 20;
+
 class FFmpegApi {
 
     constructor(introPath, outroPath) {
@@ -33,7 +37,7 @@ class FFmpegApi {
         let videoDescription = `Top Twitch Compilation #${lastVideoNumber + 1}
 If you liked this video, please make sure to check out the original creators as well.
 They are listed in order of appearance below.\n\n`;
-        let currentDuration = 0;
+        let currentDuration = introLength;
 
         for (let i = 0; i < metaList.length; i++) {
             await new Promise(((resolve, reject) => {
@@ -48,9 +52,23 @@ They are listed in order of appearance below.\n\n`;
             }));
         }
 
+        try {
+            fs.writeFileSync(__dirname + '/../video-number.txt', lastVideoNumber + 1, {encoding: 'utf-8'});
+        } catch (err) {
+            console.error(err);
+        }
+
         fs.writeFileSync(mediaDirectory + '/generated/description.txt', videoDescription, {encoding: 'utf8'});
     }
 
+    /**
+     * 
+     *
+     * @param mediaDirectory
+     * @param lastVideoNumber
+     * @returns {Promise<void>}
+     * @private
+     */
     async _generateVideoThumbnail(mediaDirectory, lastVideoNumber) {
         // TODO: generate video thumbnail
     }
@@ -71,7 +89,7 @@ They are listed in order of appearance below.\n\n`;
             const metaListPath = mediaDirectory + '/downloaded/meta.json';
             const metaList = JSON.parse(fs.readFileSync(metaListPath).toString());
 
-            for (let i = 1; i < metaList.length; i++) {
+            for (let i = 0; i < metaList.length; i++) {
                 const inputPath = mediaDirectory + '/downloaded/' + metaList[i].filename;
                 const outputPath = mediaDirectory + '/generated/' + metaList[i].filename + '.ts'
 
@@ -84,19 +102,20 @@ They are listed in order of appearance below.\n\n`;
             let mergeList = "";
 
             if (this.introPath) {
-                fs.copyFileSync(this.introPath, mediaDirectory + '/intro.ts');
+                fs.copyFileSync(this.introPath, mediaDirectory + '/generated/intro.ts');
                 mergeList += `file 'intro.ts'\n`;
             }
 
             mergeList += `file '${metaList[0].filename}.ts'\n`;
 
             for (let i = 1; i < metaList.length; i++) {
-                mergeList += `file '${intermediatePath}'\n`;
+                // TODO: implement intermediates
+                // mergeList += `file '${intermediatePath}'\n`;
                 mergeList += `file '${metaList[i].filename}.ts'\n`;
             }
 
             if (this.outroPath) {
-                fs.copyFileSync(this.outroPath, mediaDirectory + '/outro.ts');
+                fs.copyFileSync(this.outroPath, mediaDirectory + '/generated/outro.ts');
                 mergeList += `file 'outro.ts'\n`;
             }
 

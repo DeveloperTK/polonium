@@ -28,7 +28,7 @@ class TwitchApi {
         return resultClips;
     }
 
-    getYesterdaysTopClips(gameID, locale) {
+    getYesterdaysTopClips(gameID, locale, count) {
         return new Promise((resolve, reject) => {
             const today = new Date();
             this.clearDaytime(today);
@@ -62,7 +62,7 @@ class TwitchApi {
 
                 const mediaLinks = [];
 
-                for (let i = 0; i < Math.min(15, resultClips.length); i++) {
+                for (let i = 0; i < Math.min(count, resultClips.length); i++) {
                     mediaLinks.push({
                         mediaURL: resultClips[i]['thumbnail_url'].replace('-preview-480x272.jpg', '.mp4'),
                         meta: resultClips[i]

@@ -5,13 +5,23 @@ require('../config');
 const fs = require('fs');
 const https = require('https');
 
+let introPath;
+let outroPath;
+
+if (fs.existsSync(__dirname + '/../media/intro.ts'))
+    introPath = __dirname + '/../media/intro.ts';
+
+if (fs.existsSync(__dirname + '/../media/outro.ts'))
+    outroPath = __dirname + '/../media/outro.ts';
+
 // module classes
 const twitchApi = new (require('./twitch-api')).class(process.env.TWITCH_API_CLIENTID, process.env.TWITCH_API_SECRET);
-const ffmpegApi = new (require('./ffmpeg-api')).class();
+const ffmpegApi = new (require('./ffmpeg-api')).class(introPath, outroPath);
 const overlayFilters = new (require('./overlay-filters')).class();
 
 const gameID = process.argv.slice(2)[0];
 const locale = process.argv.slice(2)[1];
+let count = process.argv.slice(2)[2];
 
 const currentTime = new Date().toISOString()
     .replace(":", "-").replace(":", "-");
@@ -20,6 +30,8 @@ if (!gameID)
     throw "Missing program argument: { position: 0, name: gameID }"
 if (!locale)
     throw "Missing program argument: { position: 1, name: locale }"
+if (!count)
+    count = 15;
 
 // create directories
 
@@ -43,7 +55,7 @@ if (fs.existsSync(persistentNumberPath)) {
 
 // download clips from twitch
 
-twitchApi.getYesterdaysTopClips(gameID, locale).then(clips => {
+twitchApi.getYesterdaysTopClips(gameID, locale, count).then(clips => {
     return new Promise((resolve) => {
         let meta = [];
 

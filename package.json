@@ -4,7 +4,7 @@
   "description": "Twitch top clips compilation generator using the twitch api and ffmpeg",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node app/index.js 509658 en 3",
     "just-chatting-en": "node app/index.js 509658 en",
     "start": "node app/index.js"
   },

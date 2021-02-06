@@ -14,13 +14,13 @@ class OverlayFilters {
                     options: {
                         text: metaList[index].channel,
                         fontfile: __dirname + '/OpenSans-SemiBold.ttf',
-                        fontsize: 48,
+                        fontsize: 56,
                         fontcolor: 'white',
                         x: '(w-text_w)/2',
                         y: 75,
                         box: 1,
-                        boxborderw: 18,
-                        boxcolor: 'black@0.6'
+                        boxborderw: 12,
+                        boxcolor: 'black@0.85'
                     }
                 }
             ).addOption("-qscale 0")
